@@ -1,4 +1,4 @@
-use crate::types::{LogIndex, NodeId, Term};
+use crate::{log::LogEntry, types::{LogIndex, NodeId, Term}};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequestVoteRequest {
@@ -20,7 +20,7 @@ pub struct AppendEntriesRequest {
     pub leader_id: NodeId,
     pub prev_log_index: LogIndex,
     pub prev_log_term: Term,
-    // pub entries: Vec<LogEntry>,
+    pub entries: Vec<LogEntry>,
     pub leader_commit: LogIndex,
 }
 
