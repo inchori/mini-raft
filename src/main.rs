@@ -1,3 +1,6 @@
+use mini_raft::types::Term;
+
 fn main() {
-    println!("Hello, world!");
+    let term = Term::new(1);
+    println!("term: {:?}", term);
 }
