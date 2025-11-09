@@ -1,14 +1,14 @@
-use mini_raft::{log::{LogEntry, LogStore}, types::{LogIndex, Term}};
+use mini_raft::{log::{LogEntry, LogStore}, node::RaftNode, types::{LogIndex, NodeId, Term}};
 
 fn main() {
-    let mut store = LogStore::new();
+    let node = RaftNode::new(
+        NodeId::new(1),
+        vec![NodeId::new(2), NodeId::new(3), NodeId::new(4)],
+    );
     
-    let entry1 = LogEntry {
-        term: Term::new(1),
-        index: LogIndex::new(1),
-        command: vec![1, 2, 3],
-    };
-    
-    store.append(entry1);
-    println!("Last log index: {:?}", store.last_log_index());
+    println!("Node ID: {:?}", node.id);
+    println!("State: {:?}", node.state);
+    println!("Cluster size: {}", node.cluster_size());
+    println!("Quorum: {}", node.quorum());
+    println!("Is follower? {}", node.is_follower());
 }
