@@ -1,14 +1,18 @@
-use mini_raft::{log::{LogEntry, LogStore}, node::RaftNode, types::{LogIndex, NodeId, Term}};
+use mini_raft::timer::{Timer, random_election_timeout};
+use std::thread::sleep;
+use std::time::Duration;
 
 fn main() {
-    let node = RaftNode::new(
-        NodeId::new(1),
-        vec![NodeId::new(2), NodeId::new(3), NodeId::new(4)],
-    );
+    // 타이머 테스트
+    let timeout = random_election_timeout();
+    println!("Election timeout: {:?}", timeout);
     
-    println!("Node ID: {:?}", node.id);
-    println!("State: {:?}", node.state);
-    println!("Cluster size: {}", node.cluster_size());
-    println!("Quorum: {}", node.quorum());
-    println!("Is follower? {}", node.is_follower());
+    let mut timer = Timer::new(Duration::from_millis(100));
+    println!("Timer created, elapsed: {}", timer.is_elapsed());
+    
+    sleep(Duration::from_millis(150));
+    println!("After 150ms, elapsed: {}", timer.is_elapsed());
+    
+    timer.reset();
+    println!("After reset, elapsed: {}", timer.is_elapsed());
 }

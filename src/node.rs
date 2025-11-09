@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::log::LogStore;
+use crate::timer::{Timer, heartbeat_interval, random_election_timeout};
 use crate::types::{LogIndex, NodeId, RaftState, Term};
 
 #[derive(Debug, Clone)]
@@ -21,7 +23,11 @@ pub struct RaftNode {
 
     // Leader State
     pub next_index: HashMap<NodeId, LogIndex>,
-    pub match_index: HashMap<NodeId, LogIndex>
+    pub match_index: HashMap<NodeId, LogIndex>,
+
+    // Timer
+    pub election_timer: Timer,
+    pub heartbeat_timer: Timer
 }
 
 impl RaftNode {
@@ -37,6 +43,8 @@ impl RaftNode {
             last_applied: LogIndex::ZERO,
             next_index: HashMap::new(),
             match_index: HashMap::new(),
+            election_timer: Timer::new(random_election_timeout()),
+            heartbeat_timer: Timer::new(heartbeat_interval())
         }
     }
 
