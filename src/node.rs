@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use crate::log::LogStore;
+use crate::rpc::{AppendEntriesRequest, AppendEntriesResponse, RequestVoteRequest, RequestVoteResponse};
 use crate::timer::{Timer, heartbeat_interval, random_election_timeout};
 use crate::types::{LogIndex, NodeId, RaftState, Term};
 
@@ -27,7 +27,7 @@ pub struct RaftNode {
 
     // Timer
     pub election_timer: Timer,
-    pub heartbeat_timer: Timer
+    pub heartbeat_timer: Timer,
 }
 
 impl RaftNode {
@@ -44,7 +44,7 @@ impl RaftNode {
             next_index: HashMap::new(),
             match_index: HashMap::new(),
             election_timer: Timer::new(random_election_timeout()),
-            heartbeat_timer: Timer::new(heartbeat_interval())
+            heartbeat_timer: Timer::new(heartbeat_interval()),
         }
     }
 
@@ -66,5 +66,73 @@ impl RaftNode {
 
     pub fn quorum(&self) -> usize {
         self.cluster_size() / 2 + 1
+    }
+
+    pub fn become_follower(&mut self, term: Term) {
+        self.state = RaftState::Follower;
+        self.current_term = term;
+        self.voted_for = None;
+    }
+
+    pub fn become_candidate(&mut self) {
+        self.state = RaftState::Candidate;
+        self.current_term = Term::new(self.current_term.get() + 1);
+        self.voted_for = Some(self.id);
+    }
+
+    pub fn handle_request_vote(&mut self, request: RequestVoteRequest) -> RequestVoteResponse {
+        if request.term > self.current_term {
+            self.become_follower(request.term);
+        }
+
+        let can_vote = request.term >= self.current_term
+            && (self.voted_for.is_none() || self.voted_for == Some(request.candidate_id))
+            && self.is_log_up_to_date(request.last_log_term, request.last_log_index);
+
+        if can_vote {
+            self.voted_for = Some(request.candidate_id);
+        }
+
+        RequestVoteResponse {
+            term: self.current_term,
+            vote_granted: can_vote,
+        }
+    }
+
+    pub fn is_log_up_to_date(
+        &self,
+        candidate_last_log_term: Term,
+        candidate_last_log_index: LogIndex,
+    ) -> bool {
+        let my_last_term = self.log.last_log_term();
+        let my_last_index = self.log.last_log_index();
+
+        if candidate_last_log_term > my_last_term {
+            return true;
+        }
+
+        if candidate_last_log_term == my_last_term {
+            return candidate_last_log_index >= my_last_index;
+        }
+
+        false
+    }
+
+    pub fn handle_append_entries(&mut self, request: AppendEntriesRequest) -> AppendEntriesResponse {
+        if request.term > self.current_term {
+            self.become_follower(request.term);
+        }
+
+        if request.term < self.current_term {
+            return AppendEntriesResponse {
+                term: self.current_term,
+                success: false,
+            };
+        }
+
+        AppendEntriesResponse {
+            term: self.current_term,
+            success: false,
+        }
     }
 }

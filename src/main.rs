@@ -1,18 +1,27 @@
-use mini_raft::timer::{Timer, random_election_timeout};
-use std::thread::sleep;
-use std::time::Duration;
+use mini_raft::node::RaftNode;
+use mini_raft::rpc::RequestVoteRequest;
+use mini_raft::types::{NodeId, Term, LogIndex};
 
 fn main() {
-    // 타이머 테스트
-    let timeout = random_election_timeout();
-    println!("Election timeout: {:?}", timeout);
+    let mut node = RaftNode::new(
+        NodeId::new(1),
+        vec![NodeId::new(2), NodeId::new(3)],
+    );
     
-    let mut timer = Timer::new(Duration::from_millis(100));
-    println!("Timer created, elapsed: {}", timer.is_elapsed());
+    println!("Initial state: {:?}", node.state);
+    println!("Initial term: {:?}", node.current_term);
+    println!("Voted for: {:?}", node.voted_for);
     
-    sleep(Duration::from_millis(150));
-    println!("After 150ms, elapsed: {}", timer.is_elapsed());
+    // 투표 요청 테스트
+    let request = RequestVoteRequest {
+        term: Term::new(1),
+        candidate_id: NodeId::new(2),
+        last_log_index: LogIndex::ZERO,
+        last_log_term: Term::ZERO,
+    };
     
-    timer.reset();
-    println!("After reset, elapsed: {}", timer.is_elapsed());
+    let response = node.handle_request_vote(request);
+    println!("\nAfter vote request:");
+    println!("Vote granted: {}", response.vote_granted);
+    println!("Voted for: {:?}", node.voted_for);
 }
