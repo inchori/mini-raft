@@ -1,4 +1,4 @@
-use crate::rpc::{AppendEntriesRequest, AppendEntriesResponse, RequestVoteRequest, RequestVoteResponse};
+use crate::{rpc::{AppendEntriesRequest, AppendEntriesResponse, RequestVoteRequest, RequestVoteResponse}};
 
 #[derive(Debug, Clone)]
 pub enum RaftEvent {

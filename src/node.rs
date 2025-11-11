@@ -80,6 +80,17 @@ impl RaftNode {
         self.voted_for = Some(self.id);
     }
 
+    pub fn become_leader(&mut self) {
+        self.state = RaftState::Leader;
+        
+        let next_index_value = LogIndex::new(self.log.last_log_index().get() + 1);
+
+        for peer in &self.peers {
+            self.next_index.insert(*peer, next_index_value);
+            self.match_index.insert(*peer, LogIndex::ZERO);
+        }
+    }
+
     pub fn handle_request_vote(&mut self, request: RequestVoteRequest) -> RequestVoteResponse {
         if request.term > self.current_term {
             self.become_follower(request.term);
@@ -132,7 +143,7 @@ impl RaftNode {
 
         AppendEntriesResponse {
             term: self.current_term,
-            success: false,
+            success: true,
         }
     }
 }
