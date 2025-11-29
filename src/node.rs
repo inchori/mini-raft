@@ -112,6 +112,23 @@ impl RaftNode {
         }
     }
 
+    pub fn handle_request_response(&mut self, response: RequestVoteResponse) -> Option<bool> {
+        if !self.is_candidate() {
+            return None;
+        }
+
+        if response.term > self.current_term {
+            self.become_follower(response.term);
+            return Some(false);
+        }
+
+        if response.vote_granted {
+            None
+        } else {
+            None
+        }
+    }
+
     pub fn is_log_up_to_date(
         &self,
         candidate_last_log_term: Term,
@@ -184,7 +201,7 @@ impl RaftNode {
     pub fn handle_append_entries_response(
         &mut self,
         peer: NodeId,
-        response: AppendEntriesResponse
+        response: AppendEntriesResponse,
     ) {
         if !self.is_leader() {
             return;
@@ -200,7 +217,8 @@ impl RaftNode {
         } else {
             if let Some(next_idx) = self.next_index.get(&peer).copied() {
                 if next_idx.get() > 1 {
-                    self.next_index.insert(peer, LogIndex::new(next_idx.get() - 1));
+                    self.next_index
+                        .insert(peer, LogIndex::new(next_idx.get() - 1));
                 }
             }
         }
