@@ -7,10 +7,21 @@ fn main() {
         vec![NodeId::new(2), NodeId::new(3)],
     );
     
+    // Leader로 전환
     node.become_candidate();
-    println!("Candidate: {:?}", node.state);
-    
     node.become_leader();
-    println!("Leader: {:?}", node.state);
-    println!("next_index: {:?}", node.next_index);
+    
+    println!("State: {:?}", node.state);
+    
+    // AppendEntries 생성
+    let peer = NodeId::new(2);
+    let request = node.create_append_entries(&peer);
+    
+    println!("\nAppendEntries to {:?}:", peer);
+    println!("  term: {:?}", request.term);
+    println!("  leader_id: {:?}", request.leader_id);
+    println!("  prev_log_index: {:?}", request.prev_log_index);
+    println!("  prev_log_term: {:?}", request.prev_log_term);
+    println!("  entries: {} entries", request.entries.len());
+    println!("  leader_commit: {:?}", request.leader_commit);
 }

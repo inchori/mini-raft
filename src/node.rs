@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::log::LogStore;
-use crate::rpc::{AppendEntriesRequest, AppendEntriesResponse, RequestVoteRequest, RequestVoteResponse};
+use crate::rpc::{
+    AppendEntriesRequest, AppendEntriesResponse, RequestVoteRequest, RequestVoteResponse,
+};
 use crate::timer::{Timer, heartbeat_interval, random_election_timeout};
 use crate::types::{LogIndex, NodeId, RaftState, Term};
 
@@ -82,7 +84,7 @@ impl RaftNode {
 
     pub fn become_leader(&mut self) {
         self.state = RaftState::Leader;
-        
+
         let next_index_value = LogIndex::new(self.log.last_log_index().get() + 1);
 
         for peer in &self.peers {
@@ -129,7 +131,10 @@ impl RaftNode {
         false
     }
 
-    pub fn handle_append_entries(&mut self, request: AppendEntriesRequest) -> AppendEntriesResponse {
+    pub fn handle_append_entries(
+        &mut self,
+        request: AppendEntriesRequest,
+    ) -> AppendEntriesResponse {
         if request.term > self.current_term {
             self.become_follower(request.term);
         }
@@ -144,6 +149,60 @@ impl RaftNode {
         AppendEntriesResponse {
             term: self.current_term,
             success: true,
+        }
+    }
+
+    pub fn create_append_entries(&self, peer: &NodeId) -> AppendEntriesRequest {
+        let next_idx = self
+            .next_index
+            .get(peer)
+            .copied()
+            .unwrap_or(LogIndex::new(1));
+
+        let prev_log_index = LogIndex::new(next_idx.get().saturating_sub(1));
+        let prev_log_term = if prev_log_index.get() == 0 {
+            Term::ZERO
+        } else {
+            self.log
+                .get(prev_log_index)
+                .map(|e| e.term)
+                .unwrap_or(Term::ZERO)
+        };
+
+        let entries = vec![];
+
+        AppendEntriesRequest {
+            term: self.current_term,
+            leader_id: self.id,
+            prev_log_index,
+            prev_log_term,
+            entries,
+            leader_commit: self.commit_index,
+        }
+    }
+
+    pub fn handle_append_entries_response(
+        &mut self,
+        peer: NodeId,
+        response: AppendEntriesResponse
+    ) {
+        if !self.is_leader() {
+            return;
+        }
+
+        if response.term > self.current_term {
+            self.become_follower(response.term);
+            return;
+        }
+
+        if response.success {
+            // TODO: update match index
+        } else {
+            if let Some(next_idx) = self.next_index.get(&peer).copied() {
+                if next_idx.get() > 1 {
+                    self.next_index.insert(peer, LogIndex::new(next_idx.get() - 1));
+                }
+            }
         }
     }
 }
