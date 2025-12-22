@@ -95,8 +95,9 @@ impl RaftRunner {
                     .election_timer
                     .reset_with(random_election_timeout());
             }
-            RaftEvent::ReceivedAppendEntriesResponse(response) => {}
-
+            RaftEvent::ReceivedAppendEntriesResponse(response) => {
+                //TODO
+            }
             _ => {}
         }
     }

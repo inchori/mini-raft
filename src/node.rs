@@ -217,7 +217,10 @@ impl RaftNode {
         }
 
         if response.success {
-            // TODO: update match index
+            if let Some(next_idx) = self.next_index.get(&peer).copied() {
+                let match_idx = LogIndex::new(next_idx.get().saturating_sub(1));
+                self.match_index.insert(peer, match_idx);
+            }
         } else {
             if let Some(next_idx) = self.next_index.get(&peer).copied() {
                 if next_idx.get() > 1 {
