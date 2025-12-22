@@ -43,7 +43,7 @@ impl RaftRunner {
                     .reset_with(random_election_timeout());
 
                 println!(
-                    "  🗳️  Node {:?}: Started election (Term {:?} → {:?})",
+                    "  [ELECTION] Node {:?}: Started election (Term {:?} -> {:?})",
                     self.node.id, old_term, self.node.current_term
                 );
 

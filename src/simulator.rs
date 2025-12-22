@@ -40,7 +40,7 @@ impl Simulator {
             let after_state = runner.node().state;
 
             if before_state != after_state {
-                println!("  📢 Node {:?}: {:?} → {:?}", id, before_state, after_state);
+                println!("  [STATE] Node {:?}: {:?} -> {:?}", id, before_state, after_state);
             }
 
             for action in actions {
@@ -71,7 +71,7 @@ impl Simulator {
                         if *count >= quorum && is_candidate {
                             let sender_runner = self.runners.get_mut(&from).unwrap();
                             sender_runner.node_mut().become_leader();
-                            println!("🎉 Node {:?} became Leader! (votes: {})", from, *count);
+                            println!("[LEADER] Node {:?} became Leader! (votes: {})", from, *count);
                             
                             self.send_heartbeats(from);
                             
@@ -104,7 +104,7 @@ impl Simulator {
             
             if let Some(target_runner) = self.runners.get_mut(&peer_id) {
                 let _response = target_runner.node_mut().handle_append_entries(request);
-                println!("  💓 Heartbeat: Node {:?} → Node {:?}", leader_id, peer_id);
+                println!("  [HEARTBEAT] Node {:?} -> Node {:?}", leader_id, peer_id);
             }
         }
     }
