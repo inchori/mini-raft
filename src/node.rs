@@ -163,6 +163,10 @@ impl RaftNode {
             };
         }
 
+        if self.is_candidate() {
+            self.state = RaftState::Follower;
+        }
+
         AppendEntriesResponse {
             term: self.current_term,
             success: true,

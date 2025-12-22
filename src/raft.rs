@@ -1,6 +1,12 @@
 use std::collections::VecDeque;
 
-use crate::{event::RaftEvent, node::RaftNode, rpc::{AppendEntriesRequest, RequestVoteRequest}, timer::random_election_timeout, types::NodeId};
+use crate::{
+    event::RaftEvent,
+    node::RaftNode,
+    rpc::{AppendEntriesRequest, RequestVoteRequest},
+    timer::random_election_timeout,
+    types::NodeId,
+};
 
 pub struct RaftRunner {
     node: RaftNode,
@@ -21,13 +27,25 @@ impl RaftRunner {
         }
     }
 
+    pub fn node_mut(&mut self) -> &mut RaftNode {
+        &mut self.node
+    }
+
     pub fn tick(&mut self) -> Vec<RaftAction> {
         let mut actions = Vec::new();
 
         if self.node.election_timer.is_elapsed() {
             if self.node.is_follower() || self.node.is_candidate() {
+                let old_term = self.node.current_term;
                 self.node.become_candidate();
-                self.node.election_timer.reset_with(random_election_timeout());
+                self.node
+                    .election_timer
+                    .reset_with(random_election_timeout());
+
+                println!(
+                    "  🗳️  Node {:?}: Started election (Term {:?} → {:?})",
+                    self.node.id, old_term, self.node.current_term
+                );
 
                 for peer in &self.node.peers.clone() {
                     let request = RequestVoteRequest {
@@ -66,18 +84,18 @@ impl RaftRunner {
     pub fn handle_event(&mut self, event: RaftEvent, actions: &mut Vec<RaftAction>) {
         match event {
             RaftEvent::ReceivedRequestVote(request) => {
-                let response = self.node.handle_request_vote(request);
+                let _response = self.node.handle_request_vote(request);
             }
             RaftEvent::ReceivedRequestVoteResponse(response) => {
                 self.node.handle_request_response(response);
             }
             RaftEvent::ReceivedAppendEntries(request) => {
-                let response = self.node.handle_append_entries(request);
-                self.node.election_timer.reset_with(random_election_timeout());
+                let _response = self.node.handle_append_entries(request);
+                self.node
+                    .election_timer
+                    .reset_with(random_election_timeout());
             }
-            RaftEvent::ReceivedAppendEntriesResponse(response) => {
-
-            }
+            RaftEvent::ReceivedAppendEntriesResponse(response) => {}
 
             _ => {}
         }

@@ -11,3 +11,5 @@ pub mod timer;
 pub mod event;
 
 pub mod raft;
+
+pub mod simulator;

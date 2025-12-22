@@ -1,24 +1,28 @@
+use mini_raft::simulator::Simulator;
+use mini_raft::types::NodeId;
 use std::thread::sleep;
 use std::time::Duration;
 
-use mini_raft::node::RaftNode;
-use mini_raft::raft::RaftRunner;
-use mini_raft::types::NodeId;
-
 fn main() {
-    let node = RaftNode::new(
-        NodeId::new(1),
-        vec![NodeId::new(2), NodeId::new(3)],
-    );
+    let nodes = vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)];
+    let mut sim = Simulator::new(nodes);
     
-    let mut runner = RaftRunner::new(node);
+    println!("🚀 Starting Raft Simulation with 3 nodes");
+    sim.print_status();
     
-    println!("Initial state: {:?}", runner.node().state);
+    for tick in 1..=20 {
+        println!("--- Tick {} ---", tick);
+        sim.tick();
+        
+        // 리더 선출 확인
+        if let Some(leader) = sim.find_leader() {
+            println!("✅ Leader elected: Node {:?}", leader);
+            sim.print_status();
+            break;
+        }
+        
+        sleep(Duration::from_millis(50));
+    }
     
-    sleep(Duration::from_millis(350));
-    
-    let actions = runner.tick();
-    
-    println!("State after tick: {:?}", runner.node().state);
-    println!("Actions: {:?}", actions);
+    println!("Simulation complete!");
 }
