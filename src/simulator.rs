@@ -1,10 +1,15 @@
 use std::collections::HashMap;
 
-use crate::{event::RaftEvent, node::RaftNode, raft::{RaftAction, RaftRunner}, types::NodeId};
+use crate::{
+    event::RaftEvent,
+    node::RaftNode,
+    raft::{RaftAction, RaftRunner},
+    types::{NodeId, RaftState},
+};
 
 pub struct Simulator {
     runners: HashMap<NodeId, RaftRunner>,
-    vote_counts: HashMap<NodeId, usize>,
+    vote_counts: HashMap<(NodeId, u64), usize>,
 }
 
 impl Simulator {
@@ -34,13 +39,29 @@ impl Simulator {
 
         for (&id, runner) in &mut self.runners {
             let before_state = runner.node().state;
+            let before_term = runner.node().current_term;
 
             let actions = runner.tick();
 
             let after_state = runner.node().state;
+            let after_term = runner.node().current_term;
 
             if before_state != after_state {
                 println!("  [STATE] Node {:?}: {:?} -> {:?}", id, before_state, after_state);
+                if after_state != RaftState::Candidate {
+                    self.vote_counts.retain(|(node_id, _), _| *node_id != id);
+                }
+            }
+
+            if after_state == RaftState::Candidate && after_term != before_term {
+                let term = after_term.get();
+                self.vote_counts.insert((id, term), 1);
+                if runner.node().quorum() == 1 {
+                    runner.node_mut().become_leader();
+                    println!("[LEADER] Node {:?} became Leader! (votes: 1)", id);
+                    self.send_heartbeats(id);
+                    self.vote_counts.remove(&(id, term));
+                }
             }
 
             for action in actions {
@@ -57,26 +78,33 @@ impl Simulator {
         match action {
             RaftAction::SendRequestVote(to, request) => {
                 if let Some(target_runner) = self.runners.get_mut(&to) {
-                    target_runner.push_event(RaftEvent::ReceivedRequestVote(request.clone()));
-
                     let response = target_runner.node_mut().handle_request_vote(request);
 
-                    if response.vote_granted {
-                        let count = self.vote_counts.entry(from).or_insert(1);
+                    if let Some(sender_runner) = self.runners.get_mut(&from) {
+                        sender_runner.node_mut().handle_request_response(response.clone());
+                    }
+
+                    let sender_runner = self.runners.get(&from).unwrap();
+                    let current_term = sender_runner.node().current_term.get();
+                    let is_candidate = sender_runner.node().is_candidate();
+                    let quorum = sender_runner.node().quorum();
+
+                    if !is_candidate {
+                        self.vote_counts.retain(|(node_id, _), _| *node_id != from);
+                    }
+
+                    if response.vote_granted && is_candidate && response.term.get() == current_term {
+                        let count = self.vote_counts.entry((from, current_term)).or_insert(1);
                         *count += 1;
 
-                        let quorum = self.runners.get(&from).unwrap().node().quorum();
-                        let is_candidate = self.runners.get(&from).unwrap().node().is_candidate();
-                        
-                        if *count >= quorum && is_candidate {
+                        if *count >= quorum {
                             let sender_runner = self.runners.get_mut(&from).unwrap();
                             sender_runner.node_mut().become_leader();
                             println!("[LEADER] Node {:?} became Leader! (votes: {})", from, *count);
-                            
+
                             self.send_heartbeats(from);
-                            
-                            // vote_counts 초기화
-                            self.vote_counts.remove(&from);
+
+                            self.vote_counts.remove(&(from, current_term));
                         }
                     }
                 }
@@ -103,7 +131,7 @@ impl Simulator {
             };
             
             if let Some(target_runner) = self.runners.get_mut(&peer_id) {
-                let _response = target_runner.node_mut().handle_append_entries(request);
+                target_runner.push_event(RaftEvent::ReceivedAppendEntries(request));
                 println!("  [HEARTBEAT] Node {:?} -> Node {:?}", leader_id, peer_id);
             }
         }
