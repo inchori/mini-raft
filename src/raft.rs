@@ -81,7 +81,7 @@ impl RaftRunner {
         self.event_queue.push_back(event);
     }
 
-    pub fn handle_event(&mut self, event: RaftEvent, actions: &mut Vec<RaftAction>) {
+    pub fn handle_event(&mut self, event: RaftEvent, _actions: &mut Vec<RaftAction>) {
         match event {
             RaftEvent::ReceivedRequestVote(request) => {
                 let _response = self.node.handle_request_vote(request);
@@ -95,9 +95,8 @@ impl RaftRunner {
                     .election_timer
                     .reset_with(random_election_timeout());
             }
-            RaftEvent::ReceivedAppendEntriesResponse(response) => {
-                //TODO
-            }
+            RaftEvent::ReceivedAppendEntriesResponse(_response) => {}
+            
             _ => {}
         }
     }
