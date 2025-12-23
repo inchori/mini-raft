@@ -163,6 +163,35 @@ impl RaftNode {
             self.state = RaftState::Follower;
         }
 
+        if request.prev_log_index.get() > 0 {
+            match self.log.get(request.prev_log_index) {
+                None => {
+                    return AppendEntriesResponse {
+                        term: self.current_term,
+                        success: false,
+                    };
+                }
+                Some(entry) if entry.term != request.prev_log_term => {
+                    return AppendEntriesResponse {
+                        term: self.current_term,
+                        success: false,
+                    };
+                }
+                _ => {}
+            }
+        }
+
+        for entry in request.entries {
+            if let Some(existing) = self.log.get(entry.index) {
+                if existing.term != entry.term {
+                    self.log.truncate(entry.index);
+                }
+            }
+            if self.log.get(entry.index).is_none() {
+                self.log.append(entry);
+            }
+        }
+
         AppendEntriesResponse {
             term: self.current_term,
             success: true,
@@ -186,7 +215,7 @@ impl RaftNode {
                 .unwrap_or(Term::ZERO)
         };
 
-        let entries = vec![];
+        let entries = self.log.entries_from(next_idx);
 
         AppendEntriesRequest {
             term: self.current_term,

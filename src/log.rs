@@ -42,6 +42,14 @@ impl LogStore {
         }
     }
 
+    pub fn entries_from(&self, from_index: LogIndex) -> Vec<LogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.index >= from_index)
+            .cloned()
+            .collect()
+    }
+
     pub fn truncate(&mut self, from_index: LogIndex) {
         self.entries.retain(|entry| entry.index < from_index);
     }
