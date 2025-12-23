@@ -192,6 +192,11 @@ impl RaftNode {
             }
         }
 
+        if request.leader_commit > self.commit_index {
+            let last_new_entry = self.log.last_log_index();
+            self.commit_index = std::cmp::min(request.leader_commit, last_new_entry);
+        }
+
         AppendEntriesResponse {
             term: self.current_term,
             success: true,
@@ -245,6 +250,7 @@ impl RaftNode {
             if let Some(next_idx) = self.next_index.get(&peer).copied() {
                 let match_idx = LogIndex::new(next_idx.get().saturating_sub(1));
                 self.match_index.insert(peer, match_idx);
+                self.update_commit_index();
             }
         } else {
             if let Some(next_idx) = self.next_index.get(&peer).copied() {
@@ -271,5 +277,29 @@ impl RaftNode {
         self.log.append(entry);
 
         Some(self.log.last_log_index())
+    }
+
+    pub fn update_commit_index(&mut self) {
+        if !self.is_leader() {
+            return;
+        }
+
+        let mut match_indices: Vec<u64> = self.match_index
+            .values()
+            .map(|idx| idx.get())
+            .collect();
+
+        match_indices.push(self.log.last_log_index().get());
+
+        match_indices.sort();
+
+        let quorum_idx = match_indices.len() - self.quorum();
+        let new_commit = match_indices[quorum_idx];
+
+        if let Some(entry) = self.log.get(LogIndex::new(new_commit)) {
+            if entry.term == self.current_term && new_commit > self.commit_index.get() {
+                self.commit_index = LogIndex::new(new_commit);
+            }
+        }
     }
 }
