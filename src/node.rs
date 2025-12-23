@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::log::LogStore;
+use crate::log::{LogEntry, LogStore};
 use crate::rpc::{
     AppendEntriesRequest, AppendEntriesResponse, RequestVoteRequest, RequestVoteResponse,
 };
@@ -122,11 +122,7 @@ impl RaftNode {
             return Some(false);
         }
 
-        if response.vote_granted {
-            None
-        } else {
-            None
-        }
+        if response.vote_granted { None } else { None }
     }
 
     pub fn is_log_up_to_date(
@@ -229,5 +225,22 @@ impl RaftNode {
                 }
             }
         }
+    }
+
+    pub fn client_request(&mut self, command: Vec<u8>) -> Option<LogIndex> {
+        if !self.is_leader() {
+            return None;
+        }
+
+        let new_index = LogIndex::new(self.log.last_log_index().get() + 1);
+        let entry = LogEntry {
+            term: self.current_term,
+            index: new_index,
+            command,
+        };
+
+        self.log.append(entry);
+
+        Some(self.log.last_log_index())
     }
 }
