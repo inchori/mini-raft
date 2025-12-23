@@ -36,6 +36,7 @@ impl Simulator {
 
     pub fn tick(&mut self) {
         let mut all_actions: Vec<(NodeId, RaftAction)> = Vec::new();
+        let mut new_leaders: Vec<NodeId> = Vec::new();
 
         for (&id, runner) in &mut self.runners {
             let before_state = runner.node().state;
@@ -59,7 +60,7 @@ impl Simulator {
                 if runner.node().quorum() == 1 {
                     runner.node_mut().become_leader();
                     println!("[LEADER] Node {:?} became Leader! (votes: 1)", id);
-                    self.send_heartbeats(id);
+                    new_leaders.push(id);
                     self.vote_counts.remove(&(id, term));
                 }
             }
@@ -67,6 +68,10 @@ impl Simulator {
             for action in actions {
                 all_actions.push((id, action));
             }
+        }
+
+        for leader_id in new_leaders {
+            self.send_heartbeats(leader_id);
         }
 
         for (from, action) in all_actions {
