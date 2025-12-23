@@ -9,8 +9,12 @@ A minimal implementation of the Raft consensus algorithm in Rust for learning pu
 - [x] Request Vote RPC
 - [x] Append Entries RPC
 - [x] Multi-node simulation
-- [ ] Log replication (partial)
-- [ ] Persistence
+- [x] Log replication
+- [ ] TCP/gRPC network layer
+- [ ] CLI & Config
+- [ ] E2E Test script
+- [ ] Log Snapshot (Optional)
+- [ ] Persistence (Optional)
 
 ## Project Structure
 
