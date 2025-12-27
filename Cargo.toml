@@ -7,7 +7,8 @@ edition = "2024"
 rand = "0.9"
 tokio = { version = "1", features = ["full"] }
 tonic = "0.14"
+tonic-prost = "0.14"
 prost = "0.14"
 
 [build-dependencies]
-tonic-build = "0.12"
+tonic-prost-build = "0.14"
