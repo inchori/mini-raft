@@ -1,23 +1,59 @@
+use std::{collections::HashMap, net::SocketAddr, sync::{Arc, Mutex}, time::Duration};
+use clap::Parser;
+use mini_raft::{node::RaftNode, raft::RaftRunner, raft_proto::raft_server::RaftServer as RaftGrpcServer, server::RaftServer, types::NodeId};
 use tonic::transport::Server;
 
-use mini_raft::node::RaftNode;
-use mini_raft::raft_proto::raft_server::RaftServer as RaftGrpcServer;
-use mini_raft::server::RaftServer;
-use mini_raft::types::NodeId;
+#[derive(Parser)]
+#[command(name = "miniraft")]
+#[command(about = "A minimal Raft consensus implementation")]
+struct Args {
+    #[arg(long)]
+    id: u64,
+
+    #[arg(long)]
+    port: u16,
+
+    #[arg(long)]
+    peers: String,
+}
+
+fn parse_peers(peer_str: &str) -> HashMap<NodeId, String> {
+    let mut peers= HashMap::new();
+
+    for p in peer_str.split(',') {
+        let parts: Vec<&str> = p.split('=').collect();
+        let id: u64 = parts[0].parse().unwrap();
+        let addr = format!("http://{}", parts[1]);
+        peers.insert(NodeId::new(id), addr);
+    }
+
+    peers
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
+    let args = Args::parse();
 
-    let node = RaftNode::new(NodeId::new(1), vec![]);
-    let raft_server = RaftServer::new(node);
+    let node_id = NodeId::new(args.id);
+    let peer_addrs = parse_peers(&args.peers);
+    let peers: Vec<NodeId> = peer_addrs.keys().copied().collect();
+    let addr: SocketAddr = format!("[::1]:{}", args.port).parse()?;
 
-    println!("Raft server listening on {}", addr);
+    let node = Arc::new(Mutex::new(RaftNode::new(node_id, peers)));
+    let mut runner = RaftRunner::new(Arc::clone(&node), peer_addrs.clone());
 
-    Server::builder()
-        .add_service(RaftGrpcServer::new(raft_server))
-        .serve(addr)
-        .await?;
+    let raft_server = RaftServer::new_with_shared(Arc::clone(&node));
 
-    Ok(())
+    let _server_handle = tokio::spawn(async move {
+        Server::builder()
+            .add_service(RaftGrpcServer::new(raft_server))
+            .serve(addr)
+            .await
+    });
+
+    loop {
+        runner.tick().await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    
 }

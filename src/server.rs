@@ -20,6 +20,10 @@ impl RaftServer {
             node: Arc::new(Mutex::new(node)),
         }
     }
+
+    pub fn new_with_shared(node: Arc<Mutex<RaftNode>>) -> Self {
+        Self { node }
+    }
 }
 
 #[tonic::async_trait]

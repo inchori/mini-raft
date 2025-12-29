@@ -14,6 +14,8 @@ pub struct RaftNode {
 
     pub state: RaftState,
 
+    pub votes_received: usize,
+
     // Persistent State
     pub current_term: Term,
     pub voted_for: Option<NodeId>,
@@ -40,6 +42,7 @@ impl RaftNode {
             state: RaftState::Follower,
             current_term: Term::ZERO,
             voted_for: None,
+            votes_received: 0,
             log: LogStore::new(),
             commit_index: LogIndex::ZERO,
             last_applied: LogIndex::ZERO,
@@ -80,6 +83,7 @@ impl RaftNode {
         self.state = RaftState::Candidate;
         self.current_term = Term::new(self.current_term.get() + 1);
         self.voted_for = Some(self.id);
+        self.votes_received = 1;
     }
 
     pub fn become_leader(&mut self) {
@@ -106,6 +110,11 @@ impl RaftNode {
             self.voted_for = Some(request.candidate_id);
         }
 
+        println!(
+            "  [VOTE_REQ] Node {:?} received RequestVote from {:?} (term={:?}), voted_for={:?}, can_vote={}",
+            self.id, request.candidate_id, request.term, self.voted_for, can_vote
+        );
+
         RequestVoteResponse {
             term: self.current_term,
             vote_granted: can_vote,
@@ -122,7 +131,25 @@ impl RaftNode {
             return Some(false);
         }
 
-        if response.vote_granted { None } else { None }
+        if response.term != self.current_term {
+            return None;
+        }
+
+        if response.vote_granted {
+            self.votes_received += 1;
+            println!(
+                "  [VOTE] Node {:?} received vote ({}/{}) at term {:?}",
+                self.id, self.votes_received, self.quorum(), self.current_term
+            );
+            
+            if self.votes_received >= self.quorum() {
+                self.become_leader();
+                println!("[LEADER] Node {:?} became Leader at term {:?}!", self.id, self.current_term);
+                return Some(true);
+            }
+        }
+
+        None
     }
 
     pub fn is_log_up_to_date(
