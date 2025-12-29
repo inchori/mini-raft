@@ -12,8 +12,6 @@ pub mod event;
 
 pub mod raft;
 
-pub mod simulator;
-
 pub mod raft_proto {
     tonic::include_proto!("raft");
 }

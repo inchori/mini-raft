@@ -203,7 +203,7 @@ impl RaftNode {
         }
     }
 
-    pub fn create_append_entries(&self, peer: &NodeId) -> AppendEntriesRequest {
+    pub fn create_append_entries(&self, peer: &NodeId) -> crate::raft_proto::AppendEntriesRequest {
         let next_idx = self
             .next_index
             .get(peer)
@@ -220,15 +220,22 @@ impl RaftNode {
                 .unwrap_or(Term::ZERO)
         };
 
-        let entries = self.log.entries_from(next_idx);
+        let entries: Vec<crate::raft_proto::LogEntry> = self.log.entries_from(next_idx)
+            .into_iter()
+            .map(|e| crate::raft_proto::LogEntry {
+                term: e.term.get(),
+                index: e.index.get(),
+                command: e.command,
+            })
+            .collect();
 
-        AppendEntriesRequest {
-            term: self.current_term,
-            leader_id: self.id,
-            prev_log_index,
-            prev_log_term,
-            entries,
-            leader_commit: self.commit_index,
+        crate::raft_proto::AppendEntriesRequest {
+            term: self.current_term.get(),
+            leader_id: self.id.get(),
+            prev_log_index: prev_log_index.get(),
+            prev_log_term: prev_log_term.get(),
+            entries: entries,
+            leader_commit: self.commit_index.get(),
         }
     }
 

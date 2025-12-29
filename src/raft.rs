@@ -1,29 +1,21 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use crate::{
-    event::RaftEvent,
-    node::RaftNode,
-    rpc::{AppendEntriesRequest, RequestVoteRequest},
-    timer::random_election_timeout,
-    types::NodeId,
+    client::RaftClient, event::RaftEvent, node::RaftNode, timer::random_election_timeout, types::{NodeId, Term}
 };
 
 pub struct RaftRunner {
     node: RaftNode,
+    client: RaftClient,
     event_queue: VecDeque<RaftEvent>,
 }
 
-#[derive(Debug, Clone)]
-pub enum RaftAction {
-    SendRequestVote(NodeId, RequestVoteRequest),
-    SendAppendEntries(NodeId, AppendEntriesRequest),
-}
-
 impl RaftRunner {
-    pub fn new(node: RaftNode) -> Self {
+    pub fn new(node: RaftNode, peer_addrs: HashMap<NodeId, String>) -> Self {
         Self {
             node,
             event_queue: VecDeque::new(),
+            client: RaftClient::new(peer_addrs)
         }
     }
 
@@ -31,9 +23,7 @@ impl RaftRunner {
         &mut self.node
     }
 
-    pub fn tick(&mut self) -> Vec<RaftAction> {
-        let mut actions = Vec::new();
-
+    pub async fn tick(&mut self) {
         if self.node.election_timer.is_elapsed() {
             if self.node.is_follower() || self.node.is_candidate() {
                 let old_term = self.node.current_term;
@@ -48,13 +38,27 @@ impl RaftRunner {
                 );
 
                 for peer in &self.node.peers.clone() {
-                    let request = RequestVoteRequest {
-                        term: self.node.current_term,
-                        candidate_id: self.node.id,
-                        last_log_index: self.node.log.last_log_index(),
-                        last_log_term: self.node.log.last_log_term(),
+                    //TODO: change to From trait in rpc.rs
+                    let req = crate::raft_proto::RequestVoteRequest {
+                        term: self.node.current_term.get(),
+                        candidate_id: self.node.id.get(),
+                        last_log_index: self.node.log.last_log_index().get(),
+                        last_log_term: self.node.log.last_log_term().get(),
                     };
-                    actions.push(RaftAction::SendRequestVote(*peer, request));
+
+                    match self.client.send_request_vote(*peer, req).await {
+                        Ok(resp) => {
+                            let resp = resp.into_inner();
+                            let internal_resp = crate::rpc::RequestVoteResponse {
+                                term: Term::new(resp.term),
+                                vote_granted: resp.vote_granted,
+                            };
+                            self.node.handle_request_response(internal_resp);
+                        }
+                        Err(e) => {
+                            println!("Failed to send RequestVote to {:?}: {}", peer, e);
+                        }
+                    }
                 }
             }
         }
@@ -64,24 +68,32 @@ impl RaftRunner {
                 self.node.heartbeat_timer.reset();
 
                 for peer in &self.node.peers.clone() {
-                    let request = self.node.create_append_entries(peer);
-                    actions.push(RaftAction::SendAppendEntries(*peer, request));
+                    let req = self.node.create_append_entries(peer);
+
+                    match self.client.send_append_entries(*peer, req).await {
+                        Ok(resp) => {
+                            let resp = resp.into_inner();
+                            let internal_resp = crate::rpc::AppendEntriesResponse {
+                                term: Term::new(resp.term),
+                                success: resp.success
+                            };
+                            self.node.handle_append_entries_response(*peer, internal_resp);
+                        }   
+                        Err(e) => {
+                            println!("Failed to send AppendEntries to {:?}: {}", peer, e);
+                        }       
+                    }
                 }
             }
         }
 
-        while let Some(event) = self.event_queue.pop_front() {
-            self.handle_event(event, &mut actions);
-        }
-
-        actions
     }
 
     pub fn push_event(&mut self, event: RaftEvent) {
         self.event_queue.push_back(event);
     }
 
-    pub fn handle_event(&mut self, event: RaftEvent, _actions: &mut Vec<RaftAction>) {
+    pub fn handle_event(&mut self, event: RaftEvent) {
         match event {
             RaftEvent::ReceivedRequestVote(request) => {
                 let _response = self.node.handle_request_vote(request);

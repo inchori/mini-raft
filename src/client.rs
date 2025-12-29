@@ -8,6 +8,7 @@ use crate::types::NodeId;
 
 use crate::raft_proto::raft_client::RaftClient as RaftGrpcClient;
 
+// TODO: define error type
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 pub struct RaftClient {
