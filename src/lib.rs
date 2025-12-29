@@ -19,3 +19,5 @@ pub mod raft_proto {
 }
 
 pub mod server;
+
+pub mod client;
