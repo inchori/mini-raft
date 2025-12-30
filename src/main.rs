@@ -1,6 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr, sync::{Arc, Mutex}, time::Duration};
 use clap::Parser;
-use mini_raft::{node::RaftNode, raft::RaftRunner, raft_proto::raft_server::RaftServer as RaftGrpcServer, server::RaftServer, types::NodeId};
+use mini_raft::{http::{AppState, create_router}, node::RaftNode, raft::RaftRunner, raft_proto::raft_server::RaftServer as RaftGrpcServer, server::RaftServer, types::NodeId};
 use tonic::transport::Server;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -53,6 +53,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let raft_server = RaftServer::new_with_shared(Arc::clone(&node));
 
+    let app_state = Arc::new(AppState {
+        node: Arc::clone(&node)
+    });
+
+    let http_port = args.port + 1000;
+    let http_addr: SocketAddr = format!("[::1]:{}", http_port).parse()?;
+
+    let _http_handle = tokio::spawn(async move {
+        let listener = tokio::net::TcpListener::bind(http_addr).await.unwrap();
+        info!(addr = %http_addr, "HTTP server listening");
+        axum::serve(listener, create_router(app_state)).await.unwrap();
+    });
+
     let _server_handle = tokio::spawn(async move {
         Server::builder()
             .add_service(RaftGrpcServer::new(raft_server))
@@ -64,5 +77,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         runner.tick().await;
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    
+
 }
