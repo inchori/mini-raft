@@ -61,6 +61,12 @@ impl RaftRunner {
                 match self.client.send_request_vote(*peer, req).await {
                     Ok(resp) => {
                         let resp = resp.into_inner();
+                        info!(
+                            from = peer.get(),
+                            resp_term = resp.term,
+                            vote_granted = resp.vote_granted,
+                            "Received RequestVote response"
+                        );
                         let internal_resp = crate::rpc::RequestVoteResponse {
                             term: Term::new(resp.term),
                             vote_granted: resp.vote_granted,

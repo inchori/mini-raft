@@ -114,8 +114,10 @@ impl RaftNode {
         debug!(
             node_id = self.id.get(),
             from = request.candidate_id.get(),
-            term = request.term.get(),
+            req_term = request.term.get(),
+            my_term = self.current_term.get(),
             voted_for = ?self.voted_for,
+            my_state = ?self.state,
             can_vote = can_vote,
             "Received RequestVote"
         );
@@ -235,6 +237,8 @@ impl RaftNode {
             let last_new_entry = self.log.last_log_index();
             self.commit_index = std::cmp::min(request.leader_commit, last_new_entry);
         }
+
+        self.election_timer.reset_with(crate::timer::random_election_timeout());
 
         AppendEntriesResponse {
             term: self.current_term,
