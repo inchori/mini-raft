@@ -200,6 +200,8 @@ impl RaftNode {
             };
         }
 
+        self.election_timer.reset_with(crate::timer::random_election_timeout());
+
         if self.is_candidate() {
             self.state = RaftState::Follower;
         }
@@ -237,8 +239,6 @@ impl RaftNode {
             let last_new_entry = self.log.last_log_index();
             self.commit_index = std::cmp::min(request.leader_commit, last_new_entry);
         }
-
-        self.election_timer.reset_with(crate::timer::random_election_timeout());
 
         AppendEntriesResponse {
             term: self.current_term,

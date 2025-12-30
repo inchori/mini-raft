@@ -11,7 +11,7 @@ A minimal implementation of the Raft consensus algorithm in Rust for learning pu
 - [x] Log replication
 - [x] gRPC network layer
 - [x] CLI & Config
-- [ ] E2E Test script
+- [x] E2E Test script
 - [ ] Log Snapshot (Optional)
 - [ ] Persistence (Optional)
 
