@@ -1,4 +1,5 @@
 use std::{collections::HashMap, sync::{Arc, Mutex}};
+use tracing::{info, warn};
 
 use crate::{
     client::RaftClient, node::RaftNode, timer::random_election_timeout, types::{NodeId, Term}
@@ -42,9 +43,11 @@ impl RaftRunner {
                 )
             };
 
-            println!(
-                "  [ELECTION] Node {:?}: Started election (Term {:?} -> {:?})",
-                node_id, old_term, new_term
+            info!(
+                node_id = node_id.get(),
+                old_term = old_term.get(),
+                new_term = new_term.get(),
+                "Started election"
             );
 
             for peer in &peers {
@@ -73,7 +76,7 @@ impl RaftRunner {
                         }
                     }
                     Err(e) => {
-                        println!("Failed to send RequestVote to {:?}: {}", peer, e);
+                        warn!(peer = peer.get(), error = %e, "Failed to send RequestVote");
                     }
                 }
             }
@@ -106,7 +109,7 @@ impl RaftRunner {
                     node.handle_append_entries_response(*peer, internal_resp);
                 }   
                 Err(e) => {
-                    println!("Failed to send AppendEntries to {:?}: {}", peer, e);
+                    warn!(peer = peer.get(), error = %e, "Failed to send AppendEntries");
                 }       
             }
         }

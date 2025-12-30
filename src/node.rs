@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use tracing::{debug, info};
 
 use crate::log::{LogEntry, LogStore};
 use crate::rpc::{
@@ -110,9 +111,13 @@ impl RaftNode {
             self.voted_for = Some(request.candidate_id);
         }
 
-        println!(
-            "  [VOTE_REQ] Node {:?} received RequestVote from {:?} (term={:?}), voted_for={:?}, can_vote={}",
-            self.id, request.candidate_id, request.term, self.voted_for, can_vote
+        debug!(
+            node_id = self.id.get(),
+            from = request.candidate_id.get(),
+            term = request.term.get(),
+            voted_for = ?self.voted_for,
+            can_vote = can_vote,
+            "Received RequestVote"
         );
 
         RequestVoteResponse {
@@ -137,14 +142,21 @@ impl RaftNode {
 
         if response.vote_granted {
             self.votes_received += 1;
-            println!(
-                "  [VOTE] Node {:?} received vote ({}/{}) at term {:?}",
-                self.id, self.votes_received, self.quorum(), self.current_term
+            debug!(
+                node_id = self.id.get(),
+                votes = self.votes_received,
+                quorum = self.quorum(),
+                term = self.current_term.get(),
+                "Received vote"
             );
             
             if self.votes_received >= self.quorum() {
                 self.become_leader();
-                println!("[LEADER] Node {:?} became Leader at term {:?}!", self.id, self.current_term);
+                info!(
+                    node_id = self.id.get(),
+                    term = self.current_term.get(),
+                    "Became Leader"
+                );
                 return Some(true);
             }
         }
