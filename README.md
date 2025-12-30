@@ -29,6 +29,7 @@ src/
 ├── raft.rs       # RaftRunner - event loop with network calls
 ├── server.rs     # gRPC server (receives RPCs)
 ├── client.rs     # gRPC client (sends RPCs)
+├── http.rs       # HTTP API server
 ├── lib.rs        # Module exports
 └── main.rs       # CLI entry point
 
@@ -62,8 +63,76 @@ Run a 3-node cluster (in separate terminals):
 | Option | Description |
 |--------|-------------|
 | `--id` | Unique node ID |
-| `--port` | Port to listen on |
+| `--port` | Port to listen on (gRPC) |
 | `--peers` | Comma-separated peer list: `id=host:port,...` |
+
+## HTTP API
+
+Each node exposes an HTTP API on port `gRPC_port + 1000` (e.g., 50051 -> 51051).
+
+### GET /status
+
+Returns the current node status.
+
+```bash
+curl http://[::1]:51051/status
+```
+
+Response:
+```json
+{
+  "node_id": 1,
+  "state": "Leader",
+  "term": 5,
+  "commit_index": 3
+}
+```
+
+### POST /command
+
+Submit a command to the cluster (leader only).
+
+```bash
+curl -X POST http://[::1]:51051/command \
+  -H "Content-Type: application/json" \
+  -d '{"command": "set key value"}'
+```
+
+Response (success):
+```json
+{
+  "success": true,
+  "index": 4,
+  "error": null
+}
+```
+
+Response (not leader):
+```json
+{
+  "success": false,
+  "index": null,
+  "error": "not_leader"
+}
+```
+
+> **TODO**: Future versions will include `leader_hint` field to redirect clients to the current leader.
+
+### GET /log
+
+Returns all log entries.
+
+```bash
+curl http://[::1]:51051/log
+```
+
+Response:
+```json
+[
+  {"index": 1, "term": 1, "command": "set foo bar"},
+  {"index": 2, "term": 1, "command": "set baz qux"}
+]
+```
 
 ## References
 
